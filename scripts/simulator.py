@@ -1,8 +1,6 @@
 import os
 import numpy as np
-from lst_bin import LSTBin
-from sampler import Sampler
-import utils
+from global_signal import LSTBin, Sampler, utils
 
 N_CPUS = 4
 if N_CPUS > 1:
@@ -25,12 +23,16 @@ temp = temp[:, indx]
 nspec, nfreq = temp.shape
 fg_mean = temp.mean(axis=0)  # avg spectrum, fg only
 # this discards the last 6 min integration
-fg_bin = temp[: -(nspec % NBINS)].reshape(nspec // NBINS, NBINS, nfreq).mean(axis=0)
+fg_bin = (
+    temp[: -(nspec % NBINS)].reshape(nspec // NBINS, NBINS, nfreq).mean(axis=0)
+)
 
 # noise
 noise_75 = 3e-3
 noise_std = (
-    noise_75 * (fg_bin / fg_mean[freq == 75]) * np.sqrt(nspec / (nspec // NBINS))
+    noise_75
+    * (fg_bin / fg_mean[freq == 75])
+    * np.sqrt(nspec / (nspec // NBINS))
 )  # radiometer equation
 noise_mean_std = noise_75 * (fg_mean / fg_mean[freq == 75])
 
