@@ -1,11 +1,12 @@
 import numpy as np
-from utils import design_mat
+from .utils import design_mat
 
 
 class LSTBin:
     def __init__(self, freq, spec, noise_std, injected_t21, nfg, rng):
         """
-        Class for a LST bin, holding a spectrum, noise, design matrix and necessary covariance matrices.
+        Class for a LST bin, holding a spectrum, noise, design matrix and
+        necessary covariance matrices.
 
         Parameters
         -----------
@@ -14,16 +15,21 @@ class LSTBin:
         spec : np.ndarray
             The spectrum at the given LST bin.
         noise_std : np.ndarray
-            The standard deviation of the noise to inject at each frequency channel.
+            The standard deviation of the noise to inject at each frequency
+            channel.
         injected_t21 : np.ndarray
-            The injected 21cm signal. An array of temperature values, same length as ``freq''.
+            The injected 21cm signal. An array of temperature values, same
+            length as ``freq''.
         nfg : int
-            Number of foreground parameters to fit. If None, will be determined by minimizing BIC in compute_nfg().
+            Number of foreground parameters to fit.
+        rng : np.random.Generator
+            A numpy random number generator for generating noise.
 
         """
         self.freq = freq
         self.spec = spec.copy()
         self.noise_std = noise_std
+        self.rng = rng
         self._noise_added = False
         self.add_noise()
         self.sigma = np.diag(self.noise_std**2)
@@ -31,13 +37,12 @@ class LSTBin:
         self.injected_t21 = injected_t21
         self.nfg = nfg
         self.A = design_mat(self.freq, nfg=self.nfg)
-        # self.A /= np.sqrt(np.diag(self.A.T @ self.sigma_inv @ self.A))  # normalize
         self.compute_covs()
 
     def add_noise(self):
         if self._noise_added:
             return
-        noise = rng.normal(scale=self.noise_std)
+        noise = self.rng.normal(scale=self.noise_std)
         self.spec += noise
         self._noise_added = True
 
@@ -55,13 +60,16 @@ class LSTBin:
         self.C_total_inv = np.linalg.inv(self.sigma + V)
 
     def bin_fg_mle(self, model_t21):
-        return fg_mle(self.spec, self.A, self.sigma_inv, self.injected_t21, model_t21)
+        return fg_mle(
+            self.spec, self.A, self.sigma_inv, self.injected_t21, model_t21
+        )
 
 
 def fg_mle(spec, A, sigma_inv, true_t21, model_t21):
     """
-    Compute MLE foreground parameters given a foreground spectrum, a design matrix, an inverse noise covariance matrix,
-    an injected (true) 21cm signal and a model 21cm signal.
+    Compute MLE foreground parameters given a foreground spectrum, a design
+    matrix, an inverse noise covariance matrix, an injected (true) 21cm signal,
+    and a model 21cm signal.
 
     Parameters
     ----------
@@ -81,8 +89,8 @@ def fg_mle(spec, A, sigma_inv, true_t21, model_t21):
     theta_hat : np.ndarray
         The MLE foreground parameters.
     dstar : np.ndarray
-        The residual spectrum after subtracting the 21cm model and best-fit foregrounds from the total
-        time_bin + injected 21cm spectrum.
+        The residual spectrum after subtracting the 21cm model and best-fit
+        foregrounds from the total time_bin + injected 21cm spectrum.
 
     """
     d = spec + true_t21

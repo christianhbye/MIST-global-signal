@@ -1,7 +1,7 @@
 from multiprocessing import Pool
 import numpy as np
 import pocomc as pc
-import utils
+from . import utils
 
 
 def log_prior(params, bounds):
