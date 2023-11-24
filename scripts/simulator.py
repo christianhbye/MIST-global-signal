@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from global_signal import LSTBin, Sampler, utils
+from mistsim import LSTBin, Sampler, utils
 
 N_CPUS = 4
 if N_CPUS > 1:
@@ -11,8 +11,8 @@ TRUE_PARAMS = {"a": -0.2, "w": 20, "nu21": 80}
 BOUNDS = np.array([[-1.0, 1.0], [1.0, 60.0], [45.0, 105.0]])
 NDIM = len(BOUNDS)
 N_PARTICLES = 1000
-NBINS = 2  # 8
-NFG = np.arange(4, 6)  # np.arange(4, 9)
+NBINS = 8
+NFG = np.arange(4, 9)
 
 lst, freq, temp = utils.read_hdf5_convolution(
     "simulations/CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5",
@@ -47,8 +47,8 @@ for i in range(NBINS):
     results[i] = {}
     for n in NFG:
         print(f"NFG = {n}")
-        lst_bin = LSTBin(freq, fg_bin[i], noise_std[i], true_t21, n)
+        lst_bin = LSTBin(freq, fg_bin[i], noise_std[i], true_t21, n, rng)
         results[i][n] = sampler.run_sampler(lst_bin)
 
 # save the results
-np.savez("results.npz", results=results)
+np.savez("results.npz", results=results, true_params=TRUE_PARAMS)
