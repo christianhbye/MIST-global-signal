@@ -29,26 +29,30 @@ fg_bin = (
 
 # noise
 noise_75 = 3e-3
-noise_std = (
-    noise_75
-    * (fg_bin / fg_mean[freq == 75])
-    * np.sqrt(nspec / (nspec // NBINS))
-)  # radiometer equation
-noise_mean_std = noise_75 * (fg_mean / fg_mean[freq == 75])
+t75 = fg_mean[freq == 75]
+noise, noise_cov_inv = utils.gen_noise(
+    fg_bin, t75, ref_noise=noise_75, tint_ratio=1 / NBINS
+)
 
 # injected 21cm signal
 true_t21 = utils.gauss(freq, **TRUE_PARAMS)
 
 # initialize the sampler and run the simulations
-sampler = Sampler(N_PARTICLES, NDIM, BOUNDS, rng, n_cpus=N_CPUS)
+sampler = Sampler(N_PARTICLES, NDIM, BOUNDS, n_cpus=N_CPUS)
 results = {}
 for i in range(NBINS):
     print(f"Bin {i+1}/{NBINS}")
     results[i] = {}
     for n in NFG:
         print(f"NFG = {n}")
-        lst_bin = LSTBin(freq, fg_bin[i], noise_std[i], true_t21, n, rng)
+        lst_bin = LSTBin(freq, fg_bin[i], noise_cov_inv[i], true_t21, n)
         results[i][n] = sampler.run_sampler(lst_bin)
 
 # save the results
-np.savez("results.npz", results=results, true_params=TRUE_PARAMS)
+np.savez(
+    "results.npz",
+    results=results,
+    true_params=TRUE_PARAMS,
+    noise=noise,
+    noise_cov_inv=noise_cov_inv,
+)

@@ -3,8 +3,6 @@ import numpy as np
 
 
 def read_hdf5_convolution(path_file, print_key=False):
-    # path_file = home_folder + '/path/file.hdf5'
-    # Show keys (array names inside HDF5 file)
     with h5py.File(path_file, "r") as hf:
         if print_key:
             print([key for key in hf.keys()])
@@ -19,6 +17,41 @@ def read_hdf5_convolution(path_file, print_key=False):
         ant_temp = np.array(hfX)
 
     return lst, freq, ant_temp
+
+
+def gen_noise(spec, ref_temp, ref_noise=3e-3, tint_ratio=1, seed=1913):
+    """
+    Scale noise from a reference temperature and frequency to a range of
+    system temperatures and frequencies according to the radiometer equation.
+    This assumes equal bandwith.
+
+    Parameters
+    ----------
+    spec : np.ndarray
+        Spectrum to add noise to.
+    ref_temp : floa
+        Reference temperature in Kelvin.
+    ref_noise : float
+        Standard deviation of the noise added to the reference temperature.
+    tint_ratio : float
+        Ratio of integration times between the spectrum and the reference
+        spectrum.
+    seed : int
+        Random seed.
+
+    Returns
+    -------
+    noise : np.ndarray
+        Noise realization.
+    noise_cov_inv : np.ndarray
+        Inverse noise covariance matrix.
+
+    """
+    rng = np.random.default_rng(seed)
+    noise_std = ref_noise * spec / ref_temp / np.sqrt(tint_ratio)
+    noise = rng.normal(scale=noise_std)
+    noise_cov_inv = 1 / noise_std**2
+    return noise, noise_cov_inv
 
 
 def design_mat(freq, nfg=5, beta=-2.5, nu_fg=75):

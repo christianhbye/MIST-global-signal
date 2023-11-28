@@ -3,7 +3,7 @@ from .utils import design_mat
 
 
 class LSTBin:
-    def __init__(self, freq, spec, noise_std, injected_t21, nfg, rng):
+    def __init__(self, freq, spec, noise_cov_inv, injected_t21, nfg):
         """
         Class for a LST bin, holding a spectrum, noise, design matrix and
         necessary covariance matrices.
@@ -13,46 +13,26 @@ class LSTBin:
         freq : np.ndarray
             The frequency array corresponding to the spectrum.
         spec : np.ndarray
-            The spectrum at the given LST bin.
-        noise_std : np.ndarray
-            The standard deviation of the noise to inject at each frequency
-            channel.
+            The spectrum at the given LST bin with noise added.
+        noise_cov_inv : np.ndarray
+            Inverse noise covariance matrix.
         injected_t21 : np.ndarray
             The injected 21cm signal. An array of temperature values, same
             length as ``freq''.
         nfg : int
             Number of foreground parameters to fit.
-        rng : np.random.Generator
-            A numpy random number generator for generating noise.
 
         """
         self.freq = freq
         self.spec = spec.copy()
-        self.noise_std = noise_std
-        self.rng = rng
-        self._noise_added = False
-        self.add_noise()
-        self.sigma = np.diag(self.noise_std**2)
-        self.sigma_inv = np.diag(1 / self.noise_std**2)
+        self.sigma_inv = noise_cov_inv
         self.injected_t21 = injected_t21
         self.nfg = nfg
         self.A = design_mat(self.freq, nfg=self.nfg)
         self.compute_covs()
 
-    def add_noise(self):
-        if self._noise_added:
-            return
-        noise = self.rng.normal(scale=self.noise_std)
-        self.spec += noise
-        self._noise_added = True
-
     def compute_covs(self):
         """Compute necessary covariance matrices"""
-        if not self._noise_added:
-            raise ValueError(
-                "Cannot compute covariances without noise"
-            )  # XXX some other error probably
-
         Cinv = self.A.T @ self.sigma_inv @ self.A
         self.C = np.linalg.inv(Cinv)
         self.sigma_fg = self.A @ self.C @ self.A.T
