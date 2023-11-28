@@ -2,6 +2,7 @@ from multiprocessing import Pool
 import numpy as np
 import pocomc as pc
 from . import utils
+from .lstbin import LSTBin
 
 
 def log_prior(params, bounds):
@@ -41,11 +42,13 @@ class Sampler:
             size=(n_particles, n_dim), low=bounds.T[0], high=bounds.T[1]
         )
 
-    def run_sampler(self, lst_bins):
+    def run_sampler(self, lst_bin):
+        if isinstance(lst_bin, LSTBin):
+            lst_bin = [lst_bin]
         args = (self.n_particles, self.n_dim, log_likelihood, log_prior)
         kwargs = {
             "bounds": self.bounds,
-            "log_likelihood_args": [[lst_bin]],
+            "log_likelihood_args": [lst_bin],
             "log_prior_args": [self.bounds],
             "diagonal": False,
         }
@@ -60,9 +63,10 @@ class Sampler:
 
         results = sampler.results.copy()
         theta_map = np.mean(results["samples"], axis=0)
-        lnL = [_log_likelihood_1spec(theta_map, spec) for spec in lst_bins]
-        nparams = [self.n_dim + spec.nfg for spec in lst_bins]
-        nfreq = lst_bins[0].freq.size
-        bic = -2 * np.array(lnL) + np.array(nparams) * np.log(nfreq)
+        lnL = log_likelihood(theta_map, lst_bin)
+        nparams = self.n_dim + np.sum([spec.nfg for spec in lst_bin])
+        nfreq = lst_bin[0].freq.size
+        bic = -2 * lnL + nparams * np.log(nfreq)
         results["theta_map"] = theta_map
         results["bic"] = bic
+        return results
