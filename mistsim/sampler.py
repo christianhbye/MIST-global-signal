@@ -53,13 +53,13 @@ class Sampler:
                 kwargs["pool"] = pool
                 sampler = pc.Sampler(*args, **kwargs)
                 sampler.run(self.prior_samples)
-                logz_bs, logz_bs_error = sampler.bridge_sampling()
         else:
             sampler = pc.Sampler(*args, **kwargs)
             sampler.run(self.prior_samples)
-            logz_bs, logz_bs_error = sampler.bridge_sampling()
 
         results = sampler.results.copy()
-        results["logz_bs"] = logz_bs
-        results["logz_bs_error"] = logz_bs_error
         return results
+
+    @property
+    def bic(self):
+        raise NotImplementedError
