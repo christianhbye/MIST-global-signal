@@ -31,16 +31,17 @@ def log_likelihood(params, lst_bins):
 
 
 class Sampler:
-    def __init__(self, n_particles, n_dim, bounds, rng, n_cpus=1):
+    def __init__(self, n_particles, n_dim, bounds, n_cpus=1, seed=1913):
         self.n_particles = n_particles
         self.n_dim = n_dim
         self.bounds = bounds
         self.n_cpus = n_cpus
+        rng = np.random.default_rng(seed)
         self.prior_samples = rng.uniform(
             size=(n_particles, n_dim), low=bounds.T[0], high=bounds.T[1]
         )
 
-    def run_sampler(self, lst_bin):
+    def run_sampler(self, lst_bins):
         args = (self.n_particles, self.n_dim, log_likelihood, log_prior)
         kwargs = {
             "bounds": self.bounds,
@@ -58,8 +59,10 @@ class Sampler:
             sampler.run(self.prior_samples)
 
         results = sampler.results.copy()
-        return results
-
-    @property
-    def bic(self):
-        raise NotImplementedError
+        theta_map = np.mean(results["samples"], axis=0)
+        lnL = [_log_likelihood_1spec(theta_map, spec) for spec in lst_bins]
+        nparams = [self.n_dim + spec.nfg for spec in lst_bins]
+        nfreq = lst_bins[0].freq.size
+        bic = -2 * np.array(lnL) + np.array(nparams) * np.log(nfreq)
+        results["theta_map"] = theta_map
+        results["bic"] = bic
