@@ -50,10 +50,9 @@ class LSTBin:
         self.C_total_inv = np.linalg.inv(np.linalg.inv(self.sigma_inv) + V)
 
     def bin_fg_mle(self, model_t21):
-        if self.chrom:
-            model_t21 /= self.chrom
+        m21_chrom = model_t21 / self.chrom
         return fg_mle(
-            self.spec, self.A, self.sigma_inv, self.injected_t21, model_t21
+            self.spec, self.A, self.sigma_inv, self.injected_t21, m21_chrom
         )
 
 
