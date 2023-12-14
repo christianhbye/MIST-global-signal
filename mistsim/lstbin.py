@@ -3,7 +3,9 @@ from .utils import design_mat
 
 
 class LSTBin:
-    def __init__(self, freq, spec, noise_cov_inv, injected_t21, nfg):
+    def __init__(
+        self, freq, spec, noise_cov_inv, injected_t21, nfg, chrom=1
+    ):
         """
         Class for a LST bin, holding a spectrum, noise, design matrix and
         necessary covariance matrices.
@@ -21,12 +23,20 @@ class LSTBin:
             length as ``freq''.
         nfg : int
             Number of foreground parameters to fit.
+        chrom : np.ndarray
+            An optional chromaticy factor correction. If provided, it is
+            assumed that ``spec'' is already divided by ``chrom''
+            (because this has to be done before averaging). Here, ``chrom''
+            is used to modify the model 21cm signal to account for the
+            correction applied to the foregrounds. The default is 1, which
+            means no correction is applied.
 
         """
         self.freq = freq
         self.spec = spec.copy()
         self.sigma_inv = noise_cov_inv
-        self.injected_t21 = injected_t21
+        self.chrom = chrom
+        self.injected_t21 = injected_t21 / self.chrom
         self.nfg = nfg
         self.A = design_mat(self.freq, nfg=self.nfg)
         self.compute_covs()
@@ -37,9 +47,11 @@ class LSTBin:
         self.C = np.linalg.inv(Cinv)
         self.sigma_fg = self.A @ self.C @ self.A.T
         V = np.linalg.inv(np.linalg.inv(self.sigma_fg) - self.sigma_inv)
-        self.C_total_inv = np.linalg.inv(self.sigma + V)
+        self.C_total_inv = np.linalg.inv(np.linalg.inv(self.sigma_inv) + V)
 
     def bin_fg_mle(self, model_t21):
+        if self.chrom:
+            model_t21 /= self.chrom
         return fg_mle(
             self.spec, self.A, self.sigma_inv, self.injected_t21, model_t21
         )
@@ -54,7 +66,7 @@ def fg_mle(spec, A, sigma_inv, true_t21, model_t21):
     Parameters
     ----------
     spec : np.ndarray
-        The foreground spectrum.
+        The foreground spectrum with noise added.
     A : np.ndarray
         The design matrix of the foreground model.
     sigma_inv : np.ndarray
