@@ -42,7 +42,7 @@ class Sampler:
             size=(n_particles, n_dim), low=bounds.T[0], high=bounds.T[1]
         )
 
-    def run_sampler(self, lst_bin):
+    def run_sampler(self, lst_bin, add_samples=0):
         if isinstance(lst_bin, LSTBin):
             lst_bin = [lst_bin]
         args = (self.n_particles, self.n_dim, log_likelihood, log_prior)
@@ -57,9 +57,13 @@ class Sampler:
                 kwargs["pool"] = pool
                 sampler = pc.Sampler(*args, **kwargs)
                 sampler.run(self.prior_samples)
+                if add_samples > 0:
+                    sampler.add_samples(add_samples)
         else:
             sampler = pc.Sampler(*args, **kwargs)
             sampler.run(self.prior_samples)
+            if add_samples > 0:
+                sampler.add_samples(add_samples)
 
         results = sampler.results.copy()
         theta_map = np.mean(results["samples"], axis=0)
