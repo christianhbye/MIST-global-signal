@@ -42,11 +42,33 @@ class Sampler:
             size=(n_particles, n_dim), low=bounds.T[0], high=bounds.T[1]
         )
 
-    def run_sampler(self, lst_bin, add_samples=0):
+    def run_sampler(self, lst_bin, add_samples=0, **kwargs):
+        """
+        Run the sampler.
+
+        Parameters
+        ----------
+        lst_bin : LSTBin or list of LSTBin
+        add_samples : int
+            Number of additional samples to add to the sampler.
+        **kwargs : dict
+            Passed to `pc.Sampler.run`.
+
+        Returns
+        -------
+        results : dict
+            The dictionary returned by `pc.Sampler.run` with the following
+            additional keys:
+            - theta_map : ndarray
+                The maximum a posteriori estimate of the parameters.
+            - bic : float
+                The Bayesian information criterion.
+
+        """
         if isinstance(lst_bin, LSTBin):
             lst_bin = [lst_bin]
         args = (self.n_particles, self.n_dim, log_likelihood, log_prior)
-        kwargs = {
+        init_kwargs = {
             "bounds": self.bounds,
             "log_likelihood_args": [lst_bin],
             "log_prior_args": [self.bounds],
@@ -54,14 +76,14 @@ class Sampler:
         }
         if self.n_cpus > 1:
             with Pool(self.n_cpus) as pool:
-                kwargs["pool"] = pool
-                sampler = pc.Sampler(*args, **kwargs)
-                sampler.run(self.prior_samples)
+                init_kwargs["pool"] = pool
+                sampler = pc.Sampler(*args, **init_kwargs)
+                sampler.run(self.prior_samples, **kwargs)
                 if add_samples > 0:
                     sampler.add_samples(add_samples)
         else:
-            sampler = pc.Sampler(*args, **kwargs)
-            sampler.run(self.prior_samples)
+            sampler = pc.Sampler(*args, **init_kwargs)
+            sampler.run(self.prior_samples, **kwargs)
             if add_samples > 0:
                 sampler.add_samples(add_samples)
 
