@@ -3,9 +3,7 @@ from .utils import design_mat
 
 
 class LSTBin:
-    def __init__(
-        self, freq, spec, noise_cov_inv, nfg, chrom=1
-    ):
+    def __init__(self, freq, spec, noise_cov_inv, nfg, chrom=1):
         """
         Class for a LST bin, holding a spectrum, noise, design matrix and
         necessary covariance matrices.
