@@ -5,3 +5,4 @@ __pycache__/
 build/
 simulations/
 results/
+fit_pocoMC_21cm.py
