@@ -19,7 +19,7 @@ def read_hdf5_convolution(path_file, print_key=False):
     return lst, freq, ant_temp
 
 
-def gen_noise(spec, ref_temp, ref_noise=3e-3, tint_ratio=1, seed=1913):
+def gen_noise(spec, ref_temp, ref_noise=3e-3, tint_ratio=1, seed=0):
     """
     Scale noise from a reference temperature and frequency to a range of
     system temperatures and frequencies according to the radiometer equation.
