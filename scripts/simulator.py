@@ -36,10 +36,10 @@ if cut == 0:
     binned = total_temp.copy()
 else:
     binned = total_temp[:-cut]
-binned = binned.reshape(nspec//NBINS, NBINS, nfreq).mean(axis=0)
+binned = binned.reshape(nspec // NBINS, NBINS, nfreq).mean(axis=0)
 
 # noise
-tint_ratio = (nspec//NBINS) / nspec
+tint_ratio = (nspec // NBINS) / nspec
 noise_75 = 3e-3
 t75 = total_temp.mean(axis=0)[freq == 75]
 noise, sigma_inv = utils.gen_noise(
@@ -50,17 +50,19 @@ noise, sigma_inv = utils.gen_noise(
 # initialize the sampler and run the simulations
 sampler = Sampler(N_PARTICLES, NDIM, BOUNDS, seed=0)
 
+
 def _loop(i):
     d = {}
     for n in NFG:
         print(f"{i=}: {n}/{NFG}")
-        lst_bin = LSTBin(freq, binned[i]+noise[i], np.diag(sigma_inv[i]), n)
+        lst_bin = LSTBin(freq, binned[i] + noise[i], np.diag(sigma_inv[i]), n)
         d[n] = sampler.run_sampler(lst_bin, add_samples=int(1e4))
     return d
 
+
 pool = Pool(N_CPUS)
 results = zip(*pool.map(_loop, range(NBINS)))
-results = {i : results[i] for i in range(len(results))}
+results = {i: results[i] for i in range(len(results))}
 
 # save the results
 np.savez(
@@ -68,5 +70,5 @@ np.savez(
     results=results,
     true_params=TRUE_PARAMS,
     noise=noise,
-    noise_cov_inv=noise_cov_inv,
+    noise_cov_inv=sigma_inv,
 )
