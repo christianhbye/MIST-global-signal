@@ -1,4 +1,3 @@
-from multiprocessing import Pool
 import numpy as np
 import pocomc as pc
 from . import utils
@@ -32,11 +31,10 @@ def log_likelihood(params, lst_bins):
 
 
 class Sampler:
-    def __init__(self, n_particles, n_dim, bounds, n_cpus=1, seed=1913):
+    def __init__(self, n_particles, n_dim, bounds, seed=0):
         self.n_particles = n_particles
         self.n_dim = n_dim
         self.bounds = bounds
-        self.n_cpus = n_cpus
         rng = np.random.default_rng(seed)
         self.prior_samples = rng.uniform(
             size=(n_particles, n_dim), low=bounds.T[0], high=bounds.T[1]
@@ -74,18 +72,10 @@ class Sampler:
             "log_prior_args": [self.bounds],
             "diagonal": False,
         }
-        if self.n_cpus > 1:
-            with Pool(self.n_cpus) as pool:
-                init_kwargs["pool"] = pool
-                sampler = pc.Sampler(*args, **init_kwargs)
-                sampler.run(self.prior_samples, **kwargs)
-                if add_samples > 0:
-                    sampler.add_samples(add_samples)
-        else:
-            sampler = pc.Sampler(*args, **init_kwargs)
-            sampler.run(self.prior_samples, **kwargs)
-            if add_samples > 0:
-                sampler.add_samples(add_samples)
+        sampler = pc.Sampler(*args, **init_kwargs)
+        sampler.run(self.prior_samples, **kwargs)
+        if add_samples > 0:
+            sampler.add_samples(add_samples)
 
         results = sampler.results.copy()
         theta_map = np.mean(results["samples"], axis=0)
