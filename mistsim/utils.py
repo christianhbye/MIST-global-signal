@@ -83,20 +83,19 @@ def design_mat(freq, nfg=5, beta=-2.5, nu_fg=75):
     return A
 
 
-def gauss(f, a=-0.2, w=20, nu21=80):
+def gauss(f, a, w, nu21):
     """
-    Generate a Gaussian signal. Default parameters are the ones used in
-    Monsalve et al. 2023b.
+    Generate a Gaussian 21cm model.
 
     Parameters
     ----------
-    f : np.ndarray
+    f : array_like
         Frequencies to evaluate the model at.
-    a : float
+    a : array_like
         Amplitude of the Gaussian.
-    w : float
+    w : array_like
         FWHM of the Gaussian.
-    nu21 : float
+    nu21 : array_like
         Mean of the Gaussian.
 
     Returns
@@ -105,4 +104,9 @@ def gauss(f, a=-0.2, w=20, nu21=80):
         The Gaussian signal evaluated at the input frequencies.
 
     """
-    return a * np.exp(-1 / 2 * ((f - nu21) / w) ** 2 * 8 * np.log(2))
+    f = np.reshape(f, (1, -1))
+    a = np.reshape(a, (-1, 1))
+    w = np.reshape(w, (-1, 1))
+    nu21 = np.reshape(nu21, (-1, 1))
+    g = a * np.exp(-1 / 2 * ((f - nu21) / w) ** 2 * 8 * np.log(2))
+    return np.squeeze(g)

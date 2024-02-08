@@ -39,16 +39,17 @@ class LSTBin:
         """Compute necessary covariance matrices"""
         Cinv = self.A.T @ self.sigma_inv @ self.A
         self.C = np.linalg.inv(Cinv)
+        self.D = self.C @ self.A.T @ self.sigma_inv
         self.sigma_fg = self.A @ self.C @ self.A.T
         V = np.linalg.inv(np.linalg.inv(self.sigma_fg) - self.sigma_inv)
         self.C_total_inv = np.linalg.inv(np.linalg.inv(self.sigma_inv) + V)
 
     def bin_fg_mle(self, model_t21):
         m21_chrom = model_t21 / self.chrom
-        return fg_mle(self.spec, self.A, self.sigma_inv, m21_chrom)
+        return fg_mle(self.spec, self.A, self.C, self.D, m21_chrom)
 
 
-def fg_mle(spec, A, sigma_inv, model_t21):
+def fg_mle(spec, A, C, D, model_t21):
     """
     Compute MLE foreground parameters given a data vector, a design
     matrix, an inverse noise covariance matrix, and a model of the 21cm signal.
@@ -59,8 +60,12 @@ def fg_mle(spec, A, sigma_inv, model_t21):
         The foreground spectrum with noise and 21cm signal added.
     A : np.ndarray
         The design matrix of the foreground model.
-    sigma_inv : np.ndarray
-        The inverse noise covariance matrix.
+    C : np.ndarray
+        The foreground covariance matrix, i.e. inv(A.T @ inv(sigma) @ A),
+        where sigma is the noise covariance matrix.
+    D : np.ndarray
+        Matrix that transforms the residual spectrum to best fit parameters.
+        Given by D = C @ A.T @ inv(sigma).
     model_t21 : np.ndarray
         The assumed model of the 21cm signal.
 
@@ -74,7 +79,11 @@ def fg_mle(spec, A, sigma_inv, model_t21):
 
     """
     r = spec - model_t21
-    C = np.linalg.inv(A.T @ sigma_inv @ A)
-    theta_hat = C @ A.T @ sigma_inv @ r
+    if model_t21.ndim == 2:
+        C = np.expand_dims(C, axis=0)
+        A = np.expand_dims(A, axis=0)
+        D = np.expand_dims(D, axis=0)
+        r = np.expand_dims(r, axis=-1)
+    theta_hat = D @ r
     dstar = r - A @ theta_hat  # eq 8 in Monsalve 2018
-    return theta_hat, dstar
+    return theta_hat, np.squeeze(dstar)
