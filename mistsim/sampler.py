@@ -40,7 +40,7 @@ def log_likelihood(params, lst_bins):
     return lnL
 
 
-def run_sampler(bounds, lst_bin, pool=None, **kwargs):
+def run_sampler(bounds, lst_bin, vectorize=True, pool=None, **kwargs):
     """
     Run the sampler.
 
@@ -49,6 +49,11 @@ def run_sampler(bounds, lst_bin, pool=None, **kwargs):
     bounds : ndarray
         The bounds of the parameter space for the prior distribution.
     lst_bin : LSTBin or list of LSTBin
+    vectorize : bool
+        Make a vectorized call to the likelihood function.
+    pool : Pool
+        A pool of workers for parallel evaluation of the likelihood. Does not
+        seen to have an effect if vectorize is True.
     **kwargs : dict
         Passed to `pc.Sampler.run`.
 
@@ -72,7 +77,7 @@ def run_sampler(bounds, lst_bin, pool=None, **kwargs):
     ndim = len(bounds)
     args = (prior, log_likelihood, ndim)
     sampler = pc.Sampler(
-        *args, likelihood_args=[lst_bin], vectorize=True, pool=pool
+        *args, likelihood_args=[lst_bin], vectorize=vectorize, pool=pool
     )
     sampler.run(**kwargs)
 
