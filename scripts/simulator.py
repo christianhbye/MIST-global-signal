@@ -1,7 +1,7 @@
 import os
 from multiprocessing import Pool
 import numpy as np
-from mistsim import LSTBin, Sampler, utils
+from mistsim import LSTBin, run_sampler, utils
 
 N_CPUS = 4
 if N_CPUS > 1:
@@ -11,9 +11,8 @@ TRUE_PARAMS = {"a": -0.2, "w": 20, "nu21": 80}
 # Parameter bounds (a, w, nu21)
 BOUNDS = np.array([[-1.0, 1.0], [1.0, 60.0], [45.0, 105.0]])
 NDIM = len(BOUNDS)
-N_PARTICLES = 64
-NBINS = 24
-NFG = np.arange(4, 9)
+NBINS = 4  # XXX 24
+NFG = np.arange(4, 6)  # XXX np.arange(4, 9)
 
 lst, freq, temp = utils.read_hdf5_convolution(
     "simulations/CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5",
@@ -47,26 +46,21 @@ noise, sigma_inv = utils.gen_noise(
 )
 
 
-# initialize the sampler and run the simulations
-sampler = Sampler(N_PARTICLES, NDIM, BOUNDS, seed=0)
-
-
 def _loop(i):
     d = {}
     for n in NFG:
-        print(f"{i=}: {n}/{NFG}")
+        print(f"{i=}: {n}/{NFG[-1]}")
         lst_bin = LSTBin(freq, binned[i] + noise[i], np.diag(sigma_inv[i]), n)
-        d[n] = sampler.run_sampler(lst_bin, add_samples=int(1e4))
+        d[n] = run_sampler(BOUNDS, lst_bin)
     return d
 
 
-pool = Pool(N_CPUS)
-results = zip(*pool.map(_loop, range(NBINS)))
-results = {i: results[i] for i in range(len(results))}
+with Pool(N_CPUS) as pool:
+    results = {i: r for i, r in enumerate(pool.map(_loop, range(NBINS)))}
 
 # save the results
 np.savez(
-    "results_feb7_24bins.npz",
+    f"results_feb13_{NBINS}bins.npz",
     results=results,
     true_params=TRUE_PARAMS,
     noise=noise,
