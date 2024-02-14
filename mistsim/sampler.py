@@ -30,7 +30,7 @@ def _log_likelihood_1bin(params, lst_bin):
     dsT = np.expand_dims(dstar, axis=-2)
     Cinv = np.expand_dims(lst_bin.C_total_inv, axis=0)
     lnL = -1 / 2 * dsT @ Cinv @ ds
-    return lnL
+    return np.squeeze(lnL)
 
 
 def log_likelihood(params, lst_bins):
@@ -55,12 +55,13 @@ def run_sampler(bounds, lst_bin, **kwargs):
     Returns
     -------
     results : dict
-        The dictionary returned by `pc.Sampler.run` with the following
-        additional keys:
+        Summary statistics of the sampler. Contains the following keys:
+        - samples : ndarray
+            The samples from the posterior distribution.
         - theta_map : ndarray
             The maximum a posteriori estimate of the parameters.
         - bic : float
-            The Bayesian information criterion.
+            The Bayesian information criterion evaluated at the MAP estimate.
 
     """
     if isinstance(lst_bin, LSTBin):
@@ -73,8 +74,10 @@ def run_sampler(bounds, lst_bin, **kwargs):
     sampler = pc.Sampler(*args, likelihood_args=[lst_bin], vectorize=True)
     sampler.run(**kwargs)
 
-    results = sampler.results.copy()
-    theta_map = np.mean(results["samples"], axis=0)
+    results = {}
+    samples = sampler.posterior(resample=True)[0]
+    results["samples"] = samples
+    theta_map = np.mean(samples, axis=0)
     lnL = log_likelihood(theta_map, lst_bin)
     nparams = ndim + np.sum([spec.nfg for spec in lst_bin])
     nfreq = lst_bin[0].freq.size
