@@ -40,7 +40,7 @@ def log_likelihood(params, lst_bins):
     return lnL
 
 
-def run_sampler(bounds, lst_bin, **kwargs):
+def run_sampler(bounds, lst_bin, pool=None, **kwargs):
     """
     Run the sampler.
 
@@ -71,7 +71,9 @@ def run_sampler(bounds, lst_bin, **kwargs):
     prior = pc.Prior([uniform(loc=lo, scale=s) for lo, s in zip(loc, scale)])
     ndim = len(bounds)
     args = (prior, log_likelihood, ndim)
-    sampler = pc.Sampler(*args, likelihood_args=[lst_bin], vectorize=True)
+    sampler = pc.Sampler(
+        *args, likelihood_args=[lst_bin], vectorize=True, pool=pool
+    )
     sampler.run(**kwargs)
 
     results = {}
