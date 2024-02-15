@@ -4,6 +4,12 @@ from multiprocessing import Pool
 import numpy as np
 from mistsim import LSTBin, run_sampler, utils
 
+# case
+PATH = "CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5"
+# chromaticity correction
+CHROM = "nc"
+assert CHROM in ["nc", "pc"]
+
 VECTORIZE_LIKE = True  # vectorize the likelihood, not using parallelization
 N_CPUS = 4
 if not VECTORIZE_LIKE and N_CPUS > 1:
@@ -15,12 +21,17 @@ NDIM = len(BOUNDS)
 NBINS = 24
 NFG = np.arange(4, 9)
 
-lst, freq, temp = utils.read_hdf5_convolution(
-    "simulations/CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5",
-)
+lst, freq, temp = utils.read_hdf5_convolution(f"simulations/{PATH}")
 indx = (freq >= 45) * (freq <= 105)
 freq = freq[indx]
 temp = temp[:, indx]
+if CHROM == "nc":
+    BF = np.ones_like(temp)  # no chromaticity correction
+elif CHROM == "pc":
+    ac_path = PATH.replace(".hdf5", "_achromatic_75MHz.hdf5")
+    ac_temp = utils.read_hdf5_convolution(f"simulations/{ac_path}")[-1]
+    ac_temp = ac_temp[:, indx]
+    BF = temp / ac_temp
 nspec, nfreq = temp.shape
 
 
@@ -30,13 +41,15 @@ true_t21 = utils.gauss(freq, **TRUE_PARAMS)
 
 # binning
 cut = nspec % NBINS
-total_temp = temp + true_t21
+total_temp = (temp + true_t21) / BF
 
 if cut == 0:
     binned = total_temp.copy()
 else:
     binned = total_temp[:-cut]
+    BF_mean = BF[:-cut]
 binned = binned.reshape(nspec // NBINS, NBINS, nfreq).mean(axis=0)
+BF_mean = BF_mean.reshape(nspec // NBINS, NBINS, nfreq).mean(axis=0)
 
 # noise
 tint_ratio = (nspec // NBINS) / nspec
@@ -51,7 +64,13 @@ def _loop(i, vec=VECTORIZE_LIKE, p=None):
     d = {}
     for n in NFG:
         print(f"{i=}: {n}/{NFG[-1]}")
-        lst_bin = LSTBin(freq, binned[i] + noise[i], np.diag(sigma_inv[i]), n)
+        lst_bin = LSTBin(
+            freq,
+            binned[i] + noise[i],
+            np.diag(sigma_inv[i]),
+            n,
+            chrom=BF_mean[i],
+        )
         d[n] = run_sampler(
             BOUNDS, lst_bin, vectorize=vec, pool=p, progress=False
         )
@@ -68,7 +87,7 @@ else:
 
 # save the results
 np.savez(
-    f"results/nc/results_{NBINS}bins_sweep.npz",
+    f"results/{CHROM}/results_{NBINS}bins_sweep.npz",
     results=results,
     true_params=TRUE_PARAMS,
     noise=noise,
