@@ -7,8 +7,15 @@ from mistsim import LSTBin, run_sampler, utils
 # case
 PATH = "CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5"
 # chromaticity correction
-CHROM = "nc"
+CHROM = "pc"
 assert CHROM in ["nc", "pc"]
+print(PATH, CHROM)
+NBINS = 24
+SAVE_DIR = f"results/{CHROM}"
+assert os.path.exists(SAVE_DIR)
+SAVE_PATH = os.path.join(SAVE_DIR, f"results_{NBINS}bins_sweep.npz")
+assert not os.path.exists(SAVE_PATH)
+print(SAVE_PATH)
 
 VECTORIZE_LIKE = True  # vectorize the likelihood, not using parallelization
 N_CPUS = 4
@@ -18,7 +25,6 @@ TRUE_PARAMS = {"a": -0.2, "w": 20, "nu21": 80}
 # Parameter bounds (a, w, nu21)
 BOUNDS = np.array([[-1.0, 1.0], [1.0, 60.0], [45.0, 105.0]])
 NDIM = len(BOUNDS)
-NBINS = 24
 NFG = np.arange(4, 9)
 
 lst, freq, temp = utils.read_hdf5_convolution(f"simulations/{PATH}")
@@ -87,7 +93,7 @@ else:
 
 # save the results
 np.savez(
-    f"results/{CHROM}/results_{NBINS}bins_sweep.npz",
+    SAVE_PATH,
     results=results,
     true_params=TRUE_PARAMS,
     noise=noise,
