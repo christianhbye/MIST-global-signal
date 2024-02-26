@@ -4,6 +4,8 @@ from multiprocessing import Pool
 import numpy as np
 from mistsim import LSTBin, run_sampler, utils
 
+# sampler
+SAMPLER = "pymc"  # "pymc" or "pocomc"
 # case
 PATH = "CSA/CSA_beam_nominal_gsm_no_az_no_tilts_no_mountains.hdf5"
 # chromaticity correction
@@ -13,7 +15,7 @@ print(PATH, CHROM)
 NBINS = 24
 SAVE_DIR = f"results/{CHROM}"
 assert os.path.exists(SAVE_DIR)
-SAVE_PATH = os.path.join(SAVE_DIR, f"results_{NBINS}bins_sweep.npz")
+SAVE_PATH = os.path.join(SAVE_DIR, f"results_{NBINS}bins_sweep_{SAMPLER}.npz")
 assert not os.path.exists(SAVE_PATH)
 print(SAVE_PATH)
 
@@ -66,7 +68,16 @@ noise, sigma_inv = utils.gen_noise(
 )
 
 
-def _loop(i, vec=VECTORIZE_LIKE, p=None):
+def _loop(i, sampler, **kwargs):
+    if sampler == "pocomc":
+        vec = kwargs.pop("vec", VECTORIZE_LIKE)
+        p = kwargs.pop("p", None)
+        run = partial(run_sampler, vectorize=vec, pool=p, progress=False)
+    elif sampler == "pymc":
+        run = run_sampler
+    else:
+        raise ValueError("Unknown sampler")
+
     d = {}
     for n in NFG:
         print(f"{i=}: {n}/{NFG[-1]}")
@@ -77,19 +88,25 @@ def _loop(i, vec=VECTORIZE_LIKE, p=None):
             n,
             chrom=BF_mean[i],
         )
-        d[n] = run_sampler(
-            BOUNDS, lst_bin, vectorize=vec, pool=p, progress=False
-        )
+        d[n] = run(sampler, BOUNDS, lst_bin)
     return d
 
 
-if VECTORIZE_LIKE or N_CPUS == 1:
-    loop = partial(_loop, vec=VECTORIZE_LIKE, p=None)
-    results = {i: r for i, r in enumerate(map(loop, range(NBINS)))}
-else:
+if SAMPLER == "pymc":
+    print("Running pymc")
     with Pool(N_CPUS) as pool:
-        loop = partial(_loop, vec=False, p=pool)
+        loop = partial(_loop, sampler="pymc")
         results = {i: r for i, r in enumerate(map(loop, range(NBINS)))}
+elif SAMPLER == "pocomc":
+    if VECTORIZE_LIKE or N_CPUS == 1:
+        loop = partial(_loop, sampler="pocomc", vec=VECTORIZE_LIKE, p=None)
+        results = {i: r for i, r in enumerate(map(loop, range(NBINS)))}
+    else:
+        with Pool(N_CPUS) as pool:
+            loop = partial(_loop, sampler="pocomc", vec=False, p=pool)
+            results = {i: r for i, r in enumerate(map(loop, range(NBINS)))}
+else:
+    raise ValueError("Unknown sampler")
 
 # save the results
 np.savez(

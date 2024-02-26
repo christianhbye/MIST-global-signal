@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import uniform
 import pocomc as pc
+import pymc as pm
 from . import utils
 from .lstbin import LSTBin
 
@@ -40,26 +41,82 @@ def log_likelihood(params, lst_bins):
     return lnL
 
 
-def uniform_prior(bounds):
+def uniform_prior(sampler, bounds):
     """
     A uniform prior distribution.
 
     Parameters
     ----------
+    sampler : str
+       Which sampler to use. Either "pymc" or "pocomc".
     bounds : np.ndarray
         The bounds of the parameter space. Shape (ndim, 2).
 
     Returns
     -------
-    prior : pc.Prior
+    prior : pm.Uniform or pc.Prior
         A uniform prior distribution.
     """
-    loc = bounds.T[0]
-    scale = bounds.T[1] - bounds.T[0]
-    return pc.Prior([uniform(loc=lo, scale=s) for lo, s in zip(loc, scale)])
+    if sampler == "pymc":
+        names = ["a21", "w21", "nu21"]
+        p = [pm.Uniform(n, *b) for n, b in zip(names, bounds)]
+    elif sampler == "pocomc":
+        loc = bounds.T[0]
+        scale = bounds.T[1] - bounds.T[0]
+        p = pc.Prior([uniform(loc=lo, scale=s) for lo, s in zip(loc, scale)])
+    else:
+        raise ValueError("sampler must be 'pymc' or 'pocomc'")
+    return p
 
 
-def run_sampler(prior, lst_bin, progress=True, **kwargs):
+def run_sampler(sampler, prior_bounds, lst_bin, **kwargs):
+    """
+    Run the sampler.
+
+    Parameters
+    ----------
+    sampler : str
+        pymc or pocomc
+    prior_bounds : array-like
+        Bounds of uniform prior distribution for each parameter.
+    lst_bin : LSTBin or list of LSTBin
+    progress : bool
+        Display a progress bar.
+    kwargs : dict
+        Additional keyword arguments passed to pm.sample or pc.Sampler.
+
+    Returns
+    -------
+    results : arviz.InferenceData or dict
+        See arviz documentation (if sampler is pymc) or the documentation in
+        the ``_run_poco''-method (is sampler is pocomc) for details.
+
+    """
+    sampler = sampler.lower()
+    prior = uniform_prior(sampler, prior_bounds)
+    if sampler == "pymc":
+        return _run_pymc(prior, lst_bin, **kwargs)
+    elif sampler == "pocomc":
+        progress = kwargs.pop("progress", True)
+        return _run_poco(prior, lst_bin, progress=progress, **kwargs)
+    else:
+        raise ValueError("sampler must be 'pymc' or 'pocomc'")
+
+
+def _run_pymc(prior, lst_bin, **kwargs):
+    model = pm.Model()
+    with model:
+        a, w, nu21 = prior
+        t21_model = utils.gauss(lst_bin.freq, a, w, nu21)
+        dstar = lst_bin.bin_fg_mle(t21_model)[1]
+        Y_obs = pm.MvNormal(
+            "Y_obs", mu=0, tau=lst_bin.C_total_inv, observed=dstar
+        )
+        idata = pm.sample()
+    return idata
+
+
+def _run_poco(prior, lst_bin, progress=True, **kwargs):
     """
     Run the sampler.
 
