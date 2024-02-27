@@ -41,32 +41,23 @@ def log_likelihood(params, lst_bins):
     return lnL
 
 
-def uniform_prior(sampler, bounds):
+def uniform_prior(bounds):
     """
-    A uniform prior distribution.
+    A uniform prior distribution to be used with the pocomc sampler.
 
     Parameters
     ----------
-    sampler : str
-       Which sampler to use. Either "pymc" or "pocomc".
     bounds : np.ndarray
         The bounds of the parameter space. Shape (ndim, 2).
 
     Returns
     -------
-    prior : pm.Uniform or pc.Prior
+    prior : pc.Prior
         A uniform prior distribution.
     """
-    if sampler == "pymc":
-        names = ["a21", "w21", "nu21"]
-        p = [pm.Uniform(n, *b) for n, b in zip(names, bounds)]
-    elif sampler == "pocomc":
-        loc = bounds.T[0]
-        scale = bounds.T[1] - bounds.T[0]
-        p = pc.Prior([uniform(loc=lo, scale=s) for lo, s in zip(loc, scale)])
-    else:
-        raise ValueError("sampler must be 'pymc' or 'pocomc'")
-    return p
+    loc = bounds.T[0]
+    scale = bounds.T[1] - bounds.T[0]
+    return pc.Prior([uniform(loc=lo, scale=s) for lo, s in zip(loc, scale)])
 
 
 def run_sampler(sampler, prior_bounds, lst_bin, **kwargs):
@@ -93,26 +84,28 @@ def run_sampler(sampler, prior_bounds, lst_bin, **kwargs):
 
     """
     sampler = sampler.lower()
-    prior = uniform_prior(sampler, prior_bounds)
     if sampler == "pymc":
-        return _run_pymc(prior, lst_bin, **kwargs)
+        return _run_pymc(prior_bounds, lst_bin, **kwargs)
     elif sampler == "pocomc":
+        prior = uniform_prior(prior_bounds)
         progress = kwargs.pop("progress", True)
         return _run_poco(prior, lst_bin, progress=progress, **kwargs)
     else:
         raise ValueError("sampler must be 'pymc' or 'pocomc'")
 
 
-def _run_pymc(prior, lst_bin, **kwargs):
+def _run_pymc(bounds, lst_bin, **kwargs):
+    names = ["a21", "w21", "nu21"]
     model = pm.Model()
     with model:
-        a, w, nu21 = prior
-        t21_model = utils.gauss(lst_bin.freq, a, w, nu21)
-        dstar = lst_bin.bin_fg_mle(t21_model)[1]
+        a, w, nu21 = [pm.Uniform(n, *b) for n, b in zip(names, bounds)]
+        t21_model = utils.tensor_gauss(lst_bin.freq, a, w, nu21)
+        theta = lst_bin.bin_fg_mle(t21_model)[0]
+        mu = pm.Deterministic("mu", lst_bin.A @ theta + t21_model)
         Y_obs = pm.MvNormal(
-            "Y_obs", mu=0, tau=lst_bin.C_total_inv, observed=dstar
+            "Y_obs", mu=mu, tau=lst_bin.C_total_inv, observed=lst_bin.spec
         )
-        idata = pm.sample()
+        idata = pm.sample(**kwargs)
     return idata
 
 

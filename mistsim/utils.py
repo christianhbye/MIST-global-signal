@@ -1,5 +1,6 @@
-import h5py
 import numpy as np
+import pytensor.tensor as pt
+import h5py
 
 
 def read_hdf5_convolution(path_file, print_key=False):
@@ -110,3 +111,12 @@ def gauss(f, a, w, nu21):
     nu21 = np.reshape(nu21, (-1, 1))
     g = a * np.exp(-1 / 2 * ((f - nu21) / w) ** 2 * 8 * np.log(2))
     return np.squeeze(g)
+
+
+def tensor_gauss(f, a, w, nu21):
+    """
+    Tensor version of the Gaussian 21cm model. Not vectorized.
+    """
+    sigma = w / (2 * pt.sqrt(2 * pt.log(2)))
+    g = a * pt.exp(-1 / 2 * ((f - nu21) / sigma) ** 2)
+    return g
